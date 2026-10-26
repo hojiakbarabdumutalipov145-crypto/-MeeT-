@@ -1,0 +1,29 @@
+name: Build MeeT
+on:
+  workflow_dispatch:
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: unzip -q MeeT.zip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Build APK
+        working-directory: meet
+        run: |
+          flutter create --platforms=android --project-name meet --org uz.meet .
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/><uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/><application#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#android:label="meet"#android:label="MeeT"#' android/app/src/main/AndroidManifest.xml
+          flutter pub get
+          dart run flutter_launcher_icons
+          flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MeeT-apk
+          path: meet/build/app/outputs/flutter-apk/app-release.apk
