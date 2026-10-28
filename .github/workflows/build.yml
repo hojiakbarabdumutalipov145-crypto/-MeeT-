@@ -17,6 +17,21 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { channel: stable }
       - run: flutter create --platforms=android --project-name meet --org uz.meet .
+      - name: Eski plaginlar uchun compileSdk ni koʻtarish
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/sdk.gradle <<'EOF'
+          gradle.beforeProject { p ->
+            p.afterEvaluate {
+              def a = p.extensions.findByName('android')
+              if (a != null && p.name != 'app') {
+                def cur = 0
+                try { cur = (a.compileSdk ?: 0) as int } catch (ignored) {}
+                if (cur < 36) { a.compileSdkVersion 36 }
+              }
+            }
+          }
+          EOF
       - name: Android permissions
         run: |
           sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/><uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/><application#' android/app/src/main/AndroidManifest.xml
