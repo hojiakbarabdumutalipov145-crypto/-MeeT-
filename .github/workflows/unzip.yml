@@ -1,0 +1,27 @@
+name: Unzip
+on:
+  workflow_dispatch:
+  push:
+    paths: ['*.zip']
+permissions:
+  contents: write
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zipni ochish
+        run: |
+          mkdir /tmp/x && unzip -q ./*.zip -d /tmp/x
+          SRC=$(dirname "$(find /tmp/x -name pubspec.yaml | head -1)")
+          rm -rf lib supabase assets
+          cp -r "$SRC"/. .
+          git checkout -- .github 2>/dev/null || true
+          rm -f ./*.zip
+      - name: Commit
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Zipdan yangilandi" || echo "o'zgarish yo'q"
+          git push
