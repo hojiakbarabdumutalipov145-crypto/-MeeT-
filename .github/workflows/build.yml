@@ -1,1 +1,62 @@
-{"name":"Build MeeT","on":"workflow_dispatch","jobs":{"android":{"runs-on":"ubuntu-latest","steps":[{"uses":"actions/checkout@v4"},{"run":"unzip -q MeeT.zip"},{"run":"sed -i 's/flutter_webrtc: ^0.12.0/flutter_webrtc: ^1.1.0/' meet/pubspec.yaml"},{"uses":"actions/setup-java@v4","with":{"distribution":"temurin","java-version":"17"}},{"uses":"subosito/flutter-action@v2","with":{"channel":"stable"}},{"name":"Build APK","working-directory":"meet","run":"flutter create --platforms=android --project-name meet --org uz.meet . && sed -i \"s#<application#<uses-permission android:name='android.permission.INTERNET'/><uses-permission android:name='android.permission.CAMERA'/><uses-permission android:name='android.permission.RECORD_AUDIO'/><uses-permission android:name='android.permission.MODIFY_AUDIO_SETTINGS'/><uses-permission android:name='android.permission.ACCESS_NETWORK_STATE'/><uses-permission android:name='android.permission.BLUETOOTH_CONNECT'/><application#\" android/app/src/main/AndroidManifest.xml && sed -i \"s#android:label=.meet.#android:label='MeeT'#\" android/app/src/main/AndroidManifest.xml && flutter pub get && dart run flutter_launcher_icons && flutter build apk --release"},{"uses":"actions/upload-artifact@v4","with":{"name":"MeeT-apk","path":"meet/build/app/outputs/flutter-apk/app-release.apk"}}]}}}
+name: Build MeeT
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Loyihani MeeT-fix1.zip dan ochish
+        run: |
+          unzip -q -o MeeT-fix1.zip -d _src
+          cp -r _src/meet/. .
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - run: flutter create --platforms=android --project-name meet --org uz.meet .
+      - name: Android permissions
+        run: |
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/><uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/><application#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#android:label="meet"#android:label="MeeT"#' android/app/src/main/AndroidManifest.xml
+      - run: flutter pub get
+      - run: dart run flutter_launcher_icons
+      - run: flutter build apk --release
+      - name: Sign APK (doimiy kalit bilan)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          OUT=build/app/outputs/flutter-apk
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::KEYSTORE_BASE64 secret yoq - APK vaqtincha debug kalit bilan imzolandi (yangilanish ustiga oʻrnatilmaydi)"
+            cp $OUT/app-release.apk $OUT/MeeT.apk
+          else
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+            $BT/apksigner sign --ks "$RUNNER_TEMP/release.jks" --ks-pass env:KS_PASS --key-pass env:KEY_PASS --ks-key-alias "$KEY_ALIAS" --out $OUT/MeeT.apk $OUT/app-release.apk
+            $BT/apksigner verify --print-certs $OUT/MeeT.apk
+          fi
+      - uses: actions/upload-artifact@v4
+        with: { name: MeeT-apk, path: build/app/outputs/flutter-apk/MeeT.apk }
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Loyihani MeeT-fix1.zip dan ochish
+        shell: pwsh
+        run: |
+          Expand-Archive MeeT-fix1.zip -DestinationPath _src -Force
+          Copy-Item _src/meet/* . -Recurse -Force
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - run: flutter create --platforms=windows --project-name meet --org uz.meet .
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with: { name: MeeT-windows, path: build/windows/x64/runner/Release }
+        
